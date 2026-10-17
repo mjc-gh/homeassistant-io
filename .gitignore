@@ -1,0 +1,4 @@
+# Runtime configuration includes credentials, tokens, and the database.
+/config/
+/backups/
+.env
