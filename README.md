@@ -24,10 +24,51 @@ that timezone; confirm the Home Assistant timezone during onboarding.
 Remote clients must connect to Tailscale and their tailnet access policy must
 allow this host on TCP port 8123. Tailscale encrypts the connection between peers;
 ordinary LAN HTTP traffic is unencrypted. Home Assistant still requires login.
-No router port forwarding, subnet routing, or Tailscale Serve is needed.
+No router port forwarding or subnet routing is needed. For browser-trusted HTTPS,
+configure Tailscale Serve as described below.
 
 The LAN IP is assigned by DHCP. A router DHCP reservation for this computer keeps
 the LAN URL stable.
+
+## Tailscale HTTPS reverse proxy
+
+Tailscale Serve provides tailnet-only HTTPS at
+https://galactica.tailda91c5.ts.net and proxies to `http://127.0.0.1:8123`.
+Tailscale automatically provisions and renews the certificate.
+
+Before setup:
+
+1. Enable **MagicDNS** and **HTTPS Certificates** in the
+   [Tailscale DNS settings](https://login.tailscale.com/admin/dns).
+2. In Home Assistant 2026.8 or newer, open **Settings > System > Network >
+   HTTP server**. Enable **Trust X-Forwarded-For** and add `127.0.0.1` to
+   **Trusted proxies**. Keep Home Assistant on HTTP port `8123`. Save and confirm
+   the settings after the restart, within the five-minute confirmation window.
+3. Allow this host on TCP port **443** in your tailnet access policy.
+
+Run setup (it requests sudo for the Tailscale configuration):
+
+```sh
+./scripts/setup-tailscale.sh
+```
+
+The script checks prerequisites and forwarded requests, configures persistent
+Serve with `--bg`, and verifies the proxy configuration and HTTPS certificate.
+It can be invoked from any directory. To check status without changes:
+
+```sh
+./scripts/setup-tailscale.sh --status
+```
+
+The status command exits nonzero if a check fails, including if Funnel makes the
+endpoint public. If a conflicting Serve configuration exists, review Tailscale's
+prompt before replacing it. Initial certificate provisioning can take time; rerun
+the status check if necessary.
+
+Open the HTTPS URL from a device connected to Tailscale and verify login and live
+dashboard updates. Use it as the Companion app's external URL. Home Assistant
+still requires login. Serve resumes after reboot, and the existing direct HTTP
+URLs remain available.
 
 ## Host firewall (requires sudo)
 
