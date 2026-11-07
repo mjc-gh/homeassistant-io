@@ -14,3 +14,26 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  zwave-js-ui:
+    container_name: zwave-js-ui
+    image: zwavejs/zwave-js-ui:latest
+    restart: unless-stopped
+    stop_signal: SIGINT
+    environment:
+      TZ: America/New_York
+    devices:
+      - /dev/serial/by-id/usb-Nabu_Casa_ZWA-2_9070690BB058-if00:/dev/zwave
+    volumes:
+      - zwave-data:/usr/src/app/store
+    ports:
+      - "127.0.0.1:8091:8091"
+      - "127.0.0.1:8092:3000"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  zwave-data:

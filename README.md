@@ -212,20 +212,55 @@ Updates are manual. The `stable` tag selects the current stable release when
 pulled. Logs use Docker's rotating local driver, limited to three 10 MB files.
 The container has up to 60 seconds to close its database cleanly when stopped.
 
-## Add a USB radio later
+## Z-Wave with Connect ZWA-2
 
-Once a Zigbee or Z-Wave adapter is connected, identify its stable path under
-`/dev/serial/by-id/`, then add a mapping to the homeassistant service:
+The `zwave-js-ui` companion service owns the ZWA-2 USB adapter. Compose maps its
+stable host path
+`/dev/serial/by-id/usb-Nabu_Casa_ZWA-2_9070690BB058-if00` to `/dev/zwave`
+inside that container. Home Assistant connects to its WebSocket server rather
+than opening the serial device directly. Only one service should open the radio.
 
-```yaml
-    devices:
-      - /dev/serial/by-id/REPLACE_WITH_ACTUAL_RADIO_ID:/dev/ttyUSB0
+Start or recreate the companion service without restarting Home Assistant:
+
+```sh
+docker compose config --quiet
+docker compose up -d zwave-js-ui
+docker compose logs --tail=100 zwave-js-ui
 ```
 
-Run `docker compose up -d` to recreate the container, then configure the
-integration. Zigbee ZHA can use the radio directly. Z-Wave typically needs a
-separate Z-Wave JS server; give the radio to that service instead. A radio should
-only be opened by one service at a time.
+Open http://localhost:8091 on this host. The management UI (8091) and WebSocket
+server (8092) are bound only to host loopback, not the LAN or Tailscale interfaces.
+For remote administration, run this on your client computer, then open
+http://localhost:8091 there:
+
+```sh
+ssh -L 8091:127.0.0.1:8091 mcoyne@galactica
+```
+
+In Z-Wave JS UI settings:
+
+1. Set the Z-Wave serial port to `/dev/zwave`.
+2. Set the RF region to **USA** for US-region devices.
+3. For a new network, generate and retain the network security keys. If replacing
+   an existing controller, migrate its network and keys instead of starting over.
+4. Under Home Assistant settings, enable the **WS Server** on port **3000** and
+   save the settings. Compose exposes this internal port as host port **8092**.
+   MQTT is not required.
+
+In Home Assistant, go to **Settings > Devices & services > Add integration >
+Z-Wave** and connect to the existing server at `ws://127.0.0.1:8092`. This address
+works because the Home Assistant container uses host networking. Pair devices
+through the integration after the controller connects.
+
+Z-Wave JS UI settings and security keys persist in the Compose-managed
+`zwave-data` volume mounted at `/usr/src/app/store`. This data is outside
+`./config` and is not covered by Home Assistant's own backups. Use Z-Wave JS UI's
+backup/export features to save the store and controller NVM backups, and retain
+copies off this machine. Do not use `docker compose down -v` unless you intend to
+delete the persistent volume.
+
+If the adapter is unplugged or its device node changes, reconnect it and run
+`docker compose up -d --force-recreate zwave-js-ui` to refresh the USB mapping.
 
 Bluetooth and blanket privileged access are not enabled. This installation type
 does not include the Home Assistant OS managed add-on/app system; companion
